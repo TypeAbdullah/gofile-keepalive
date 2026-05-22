@@ -3,109 +3,218 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gofile Link Keep-Alive Dashboard</title>
+  <title>Gofile Enterprise Keep-Alive Panel</title>
   <style>
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: #0f172a;
-      color: #e2e8f0;
-      padding: 40px 20px;
-      max-width: 600px;
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #0b0f19;
+      color: #f1f5f9;
+      padding: 30px 15px;
+      max-width: 800px;
       margin: 0 auto;
     }
-    h1 { color: #f8fafc; font-size: 24px; margin-bottom: 8px; }
-    p { color: #94a3b8; font-size: 14px; margin-top: 0; }
+    h1 { color: #ffffff; font-size: 26px; margin-bottom: 5px; }
+    .subtitle { color: #64748b; font-size: 14px; margin-top: 0; margin-bottom: 25px; }
     .card {
-      background-color: #1e293b;
+      background-color: #111827;
+      border: 1px solid #1f2937;
       padding: 24px;
       border-radius: 12px;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
       margin-bottom: 20px;
     }
-    label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; }
-    input[type="text"] {
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    label { display: block; font-weight: 500; margin-bottom: 6px; font-size: 13px; color: #9ca3af; }
+    input {
       width: 100%;
-      padding: 12px;
-      background-color: #0f172a;
-      border: 1px solid #334155;
-      border-radius: 6px;
+      padding: 10px 14px;
+      background-color: #030712;
+      border: 1px solid #374151;
+      border-radius: 8px;
       color: #fff;
       font-size: 14px;
       box-sizing: border-box;
-      margin-bottom: 16px;
     }
+    input:focus { border-color: #3b82f6; outline: none; }
+    .row-span { grid-column: span 2; }
     button {
       background-color: #2563eb;
       color: white;
       border: none;
-      padding: 12px 20px;
+      padding: 12px;
       font-size: 14px;
       font-weight: 600;
-      border-radius: 6px;
+      border-radius: 8px;
       cursor: pointer;
       width: 100%;
-      transition: background 0.2s;
+      transition: background 0.15s;
     }
     button:hover { background-color: #1d4ed8; }
-    #result {
+    
+    /* Metrics panel styling */
+    .metrics-container {
+      display: none;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .metric-card {
+      background: #111827;
+      border: 1px solid #1f2937;
+      padding: 16px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .metric-card h3 { font-size: 12px; text-transform: uppercase; color: #64748b; margin: 0 0 8px 0; }
+    .metric-card p { font-size: 20px; font-weight: 700; margin: 0; color: #3b82f6; }
+    
+    /* Status indicators */
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      font-size: 11px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .badge-success { background: #065f46; color: #34d399; }
+    .badge-error { background: #7f1d1d; color: #f87171; }
+
+    #log {
       white-space: pre-wrap;
       font-family: monospace;
       font-size: 12px;
-      background-color: #0f172a;
+      background-color: #030712;
+      border: 1px solid #1f2937;
       padding: 16px;
-      border-radius: 6px;
-      border: 1px solid #334155;
+      border-radius: 8px;
+      max-height: 300px;
+      overflow-y: auto;
       display: none;
     }
   </style>
 </head>
 <body>
 
-  <h1>Gofile Link Saver Panel</h1>
-  <p>Trigger activity checks to update the 30-day inactivity timer on Gofile folders.</p>
+  <h1>Gofile Link Saver Enterprise</h1>
+  <div class="subtitle">Recursive crawler with low-bandwidth keep-alive routines and webhook dispatch.</div>
 
   <div class="card">
-    <label for="url">Gofile Link or Folder ID</label>
-    <input type="text" id="url" placeholder="https://gofile.io/d/AbC123" required>
-
-    <label for="token">Optional Bearer Token (If API is locked)</label>
-    <input type="text" id="token" placeholder="Your API Secret">
-
-    <button onclick="pingFolder()">Ping Folder Contents</button>
+    <div class="grid">
+      <div class="row-span">
+        <label for="url">Gofile Link / Folder ID</label>
+        <input type="text" id="url" placeholder="https://gofile.io/d/AbC123" required>
+      </div>
+      <div>
+        <label for="webhook">Webhook URL (Optional - Runs Asynchronously)</label>
+        <input type="text" id="webhook" placeholder="https://yoursite.com/api/gofile-callback">
+      </div>
+      <div>
+        <label for="delay">Throttling Delay (ms)</label>
+        <input type="number" id="delay" value="200" min="50">
+      </div>
+      <div class="row-span">
+        <label for="token">Bearer Token (If API access is locked)</label>
+        <input type="password" id="token" placeholder="Optional API Token">
+      </div>
+    </div>
+    <button onclick="executeJob()">Execute Maintenance Task</button>
   </div>
 
-  <pre id="result"></pre>
+  <div class="metrics-container" id="metricsPanel">
+    <div class="metric-card">
+      <h3>Dirs Scanned</h3>
+      <p id="mDirs">0</p>
+    </div>
+    <div class="metric-card">
+      <h3>Files Processed</h3>
+      <p id="mFiles">0</p>
+    </div>
+    <div class="metric-card">
+      <h3>Status Success</h3>
+      <p id="mSuccess" style="color: #10b981;">0</p>
+    </div>
+    <div class="metric-card">
+      <h3>Bandwidth Saved</h3>
+      <p id="mSaved">0 MB</p>
+    </div>
+  </div>
+
+  <pre id="log"></pre>
 
   <script>
-    async function pingFolder() {
-      const urlInput = document.getElementById('url').value.trim();
-      const apiToken = document.getElementById('token').value.trim();
-      const resultBox = document.getElementById('result');
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
 
-      if (!urlInput) {
-        alert('Please enter a Gofile Link or Folder ID');
+    async function executeJob() {
+      const url = document.getElementById('url').value.trim();
+      const webhookUrl = document.getElementById('webhook').value.trim();
+      const delayMs = parseInt(document.getElementById('delay').value) || 200;
+      const apiToken = document.getElementById('token').value.trim();
+      const logBox = document.getElementById('log');
+      const metricsPanel = document.getElementById('metricsPanel');
+
+      if (!url) {
+        alert('Please specify a target Gofile directory URL');
         return;
       }
 
-      resultBox.style.display = 'block';
-      resultBox.textContent = 'Processing files, please wait...';
+      // Reset and Open logs
+      logBox.style.display = 'block';
+      logBox.textContent = 'Contacting server and validating links...';
+      metricsPanel.style.display = 'none';
 
       const headers = { 'Content-Type': 'application/json' };
       if (apiToken) {
         headers['Authorization'] = `Bearer ${apiToken}`;
       }
 
+      const body = { url, delayMs };
+      if (webhookUrl) {
+        body.webhookUrl = webhookUrl;
+      }
+
       try {
         const response = await fetch('/api/keep-alive', {
           method: 'POST',
-          headers: headers,
-          body: JSON.stringify({ url: urlInput })
+          headers,
+          body: JSON.stringify(body)
         });
 
-        const data = await response.json();
-        resultBox.textContent = JSON.stringify(data, null, 2);
+        const resData = await response.json();
+
+        if (response.status === 202) {
+          logBox.textContent = `[Async Processing Initialized]\n\nTask Accepted: ${resData.message}\nJob Folder: ${resData.folderId}`;
+          return;
+        }
+
+        if (!response.ok) {
+          logBox.textContent = `Server Error: ${resData.error || response.statusText}`;
+          return;
+        }
+
+        // Output Synchronous metrics
+        const { stats, filesProcessed } = resData.data;
+        
+        metricsPanel.style.display = 'grid';
+        document.getElementById('mDirs').textContent = stats.totalFoldersProcessed;
+        document.getElementById('mFiles').textContent = stats.totalFilesProcessed;
+        document.getElementById('mSuccess').textContent = `${stats.totalSuccessfulPings} / ${stats.totalFilesProcessed}`;
+        document.getElementById('mSaved').textContent = formatBytes(stats.bandwidthSavedBytes);
+
+        // Generate visual status log
+        let textLog = `Job execution completed in ${stats.elapsedTimeMs}ms.\n\nProcessed Files:\n`;
+        filesProcessed.forEach(f => {
+          const statusTxt = f.success ? '[OK 206]' : `[ERR ${f.status}]`;
+          textLog += `${statusTxt} - ${f.name} (${formatBytes(f.size)})\n`;
+        });
+        logBox.textContent = textLog;
+
       } catch (err) {
-        resultBox.textContent = 'Network error: ' + err.message;
+        logBox.textContent = 'API processing failed: ' + err.message;
       }
     }
   </script>
